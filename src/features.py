@@ -5,7 +5,6 @@ Fait le pont entre une demande de credit recue par l'API et le vecteur de
 145 colonnes attendu par le modele. Le resultat doit etre identique a ce
 qu'aurait produit le pipeline d'entrainement pour ce meme client.
 
-Voir docs/features_explained.md pour le detail du raisonnement.
 """
 
 import json
