@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
-data/
+data/*
+!data/store.parquet
 mlruns/
 .pytest_cache/
