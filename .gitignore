@@ -7,3 +7,5 @@ data/*
 !data/store.parquet
 mlruns/
 .pytest_cache/
+.coverage
+htmlcov/
