@@ -1,0 +1,22 @@
+.git/
+.gitignore
+.github/
+
+venv/
+**/__pycache__
+**/*.py[cod]
+
+# Executes par le job CI sur le runner, avant la construction de l'image.
+tests/
+pytest.ini
+requirements-dev.txt
+.pytest_cache/
+.coverage
+
+# Dependent d'un CSV absent du depot : inexecutables dans le conteneur.
+scripts/
+
+# Jamais lue a l'execution.
+artifacts/permutation_importance.csv
+
+**/.DS_Store
