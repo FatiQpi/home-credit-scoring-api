@@ -12,6 +12,7 @@ import pickle
 from pathlib import Path
 
 import pandas as pd
+import pyarrow
 
 RACINE = Path(__file__).resolve().parent.parent
 ARTIFACTS_DIR = RACINE / "artifacts"
@@ -86,6 +87,10 @@ def load_store(feature_names: list[str], path: Path = STORE_PATH) -> pd.DataFram
 
     if store.index.name != "SK_ID_CURR":
         raise ValueError("Le magasin doit etre indexe sur SK_ID_CURR.")
+
+    # read_parquet laisse ~600 Mo de tampons de decompression dans le pool
+    # Arrow. L'API charge une fois et ne realloue plus.
+    pyarrow.default_memory_pool().release_unused()
 
     return store
 
