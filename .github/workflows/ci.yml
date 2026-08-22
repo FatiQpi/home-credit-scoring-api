@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feature/api]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Installe les dependances
+        run: pip install -r requirements-dev.txt
+
+      - name: Lance les tests
+        run: python -m pytest --cov=src --cov-report=term
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construit l'image
+        run: docker build -t scoring-api:${{ github.sha }} .
+
+      - name: Demarre le conteneur
+        run: |
+          docker run -d --name scoring -p 8000:7860 \
+            scoring-api:${{ github.sha }}
+
+      - name: Attend le demarrage
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "Service pret apres ${i} tentatives."
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs scoring
+          exit 1
+
+      # Le build n'importe jamais lightgbm : seule une prediction reelle valide
+      # le modele dans l'image. 0.8344 est le score connu du client 100002.
+      - name: Verifie une prediction connue
+        run: |
+          reponse=$(curl -sf -X POST http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{"SK_ID_CURR": 100002}')
+          echo "$reponse"
+          echo "$reponse" | grep -q '"score_risque":0.8344'
