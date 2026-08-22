@@ -236,7 +236,7 @@ home-credit-scoring-api/
 │   ├── model.pkl                    modèle LightGBM sérialisé
 │   ├── feature_names.json           les 145 features, dans l'ordre attendu
 │   ├── categories.json              modalités figées des 16 colonnes catégorielles
-│   └── permutation_importance.csv   analyse d'importance (pièce justificative)
+│   └── permutation_importance.csv
 ├── data/
 │   └── store.parquet                307 505 clients × 145 features, 40 Mo
 ├── scripts/
