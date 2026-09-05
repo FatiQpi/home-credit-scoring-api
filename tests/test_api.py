@@ -82,6 +82,13 @@ def test_health(client):
     assert reponse.json() == {"status": "ok"}
 
 
+def test_racine(client):
+    corps = client.get("/").json()
+
+    assert corps["documentation"] == "/docs"
+    assert "/predict" in corps["endpoints"]
+
+
 # --- Documentation ---
 
 
