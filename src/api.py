@@ -54,6 +54,18 @@ async def client_not_found_handler(
     return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
+# Sans cette route, la racine du Space repond 404 au visiteur qui ouvre le
+# lien.
+@app.get("/", summary="Description du service")
+def racine(request: Request) -> dict:
+    return {
+        "service": request.app.title,
+        "version": request.app.version,
+        "documentation": "/docs",
+        "endpoints": ["/predict", "/health"],
+    }
+
+
 # def et non async def : pandas et LightGBM bloquent. FastAPI execute alors la
 # route dans un thread auxiliaire et la boucle d'evenements reste libre.
 @app.post(
@@ -62,6 +74,8 @@ async def client_not_found_handler(
     summary="Score un client par son identifiant",
     responses={404: {"description": "Aucune donnee pour cet identifiant."}},
 )
+
+
 def predire(demande: Demande, request: Request) -> dict:
     features = get_features(demande.SK_ID_CURR, request.app.state.store)
     resultat = predict(request.app.state.model, features)
