@@ -104,6 +104,8 @@ jobs:
       # qu'une fusion ne touche aucun fichier copie ci-dessus. Sans cette
       # condition, le pipeline echouerait sans qu'aucun probleme reel existe.
       - name: Publie sur le Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           cd "${RUNNER_TEMP}/space"
           git config user.name "github-actions"
@@ -113,5 +115,7 @@ jobs:
             echo "Aucun changement a publier."
           else
             git commit -m "Deploiement depuis ${GITHUB_SHA}"
-            git push
+            git push \
+              "https://Fatih09:${HF_TOKEN}@huggingface.co/spaces/Fatih09/home-credit-scoring-api" \
+              main
           fi
