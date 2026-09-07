@@ -75,16 +75,17 @@ jobs:
         with:
           lfs: true
 
-      # On part du depot du Space, jamais d'un depot neuf : son .gitattributes
-      # declare le suivi LFS de .parquet et .pkl, et son README.md porte
-      # l'en-tete YAML de configuration. Les recreer serait les perdre.
+      # LFS ouvre sa propre connexion et ne reprend pas les identifiants de
+      # l'URL du depot : le jeton doit lui etre fourni separement.
       - name: Clone le Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           git lfs install
+          git config --global credential.helper store
+          echo "https://Fatih09:${HF_TOKEN}@huggingface.co" > ~/.git-credentials
           git clone \
-            "https://Fatih09:${HF_TOKEN}@huggingface.co/spaces/Fatih09/home-credit-scoring-api" \
+            "https://huggingface.co/spaces/Fatih09/home-credit-scoring-api" \
             "${RUNNER_TEMP}/space"
 
       - name: Copie les fichiers attendus par le Dockerfile
