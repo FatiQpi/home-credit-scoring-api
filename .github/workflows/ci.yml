@@ -62,3 +62,55 @@ jobs:
             -d '{"SK_ID_CURR": 100002}')
           echo "$reponse"
           echo "$reponse" | grep -q '"score_risque":0.8344'
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      # lfs sans objet aujourd'hui : le depot GitHub n'en declare aucun. Garde
+      # car l'oubli echouerait en silence, un pointeur etant copie a la place du
+      # magasin et le conteneur ne plantant qu'au demarrage.
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      # On part du depot du Space, jamais d'un depot neuf : son .gitattributes
+      # declare le suivi LFS de .parquet et .pkl, et son README.md porte
+      # l'en-tete YAML de configuration. Les recreer serait les perdre.
+      - name: Clone le Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git lfs install
+          git clone \
+            "https://Fatih09:${HF_TOKEN}@huggingface.co/spaces/Fatih09/home-credit-scoring-api" \
+            "${RUNNER_TEMP}/space"
+
+      - name: Copie les fichiers attendus par le Dockerfile
+        run: |
+          cd "${RUNNER_TEMP}/space"
+          mkdir -p src artifacts data
+          cp "${GITHUB_WORKSPACE}/Dockerfile" .
+          cp "${GITHUB_WORKSPACE}/requirements.txt" .
+          cp "${GITHUB_WORKSPACE}"/src/*.py src/
+          cp "${GITHUB_WORKSPACE}"/artifacts/model.pkl artifacts/
+          cp "${GITHUB_WORKSPACE}"/artifacts/feature_names.json artifacts/
+          cp "${GITHUB_WORKSPACE}"/artifacts/categories.json artifacts/
+          cp "${GITHUB_WORKSPACE}"/data/store.parquet data/
+
+      # git commit sort en erreur quand rien n'a change, ce qui arrive des
+      # qu'une fusion ne touche aucun fichier copie ci-dessus. Sans cette
+      # condition, le pipeline echouerait sans qu'aucun probleme reel existe.
+      - name: Publie sur le Space
+        run: |
+          cd "${RUNNER_TEMP}/space"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Aucun changement a publier."
+          else
+            git commit -m "Deploiement depuis ${GITHUB_SHA}"
+            git push
+          fi
