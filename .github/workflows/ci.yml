@@ -68,15 +68,14 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      # lfs sans objet aujourd'hui : le depot GitHub n'en declare aucun. Garde
-      # car l'oubli echouerait en silence, un pointeur etant copie a la place du
-      # magasin et le conteneur ne plantant qu'au demarrage.
+      # Sans objet aujourd'hui, garde car l'oubli echouerait en silence si le
+      # depot passait un jour a LFS.
       - uses: actions/checkout@v4
         with:
           lfs: true
 
-      # LFS ouvre sa propre connexion et ne reprend pas les identifiants de
-      # l'URL du depot : le jeton doit lui etre fourni separement.
+      # On clone le Space plutot que d'y pousser un depot neuf : son
+      # .gitattributes et l'en-tete YAML de son README seraient perdus.
       - name: Clone le Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -100,9 +99,8 @@ jobs:
           cp "${GITHUB_WORKSPACE}"/artifacts/categories.json artifacts/
           cp "${GITHUB_WORKSPACE}"/data/store.parquet data/
 
-      # git commit sort en erreur quand rien n'a change, ce qui arrive des
-      # qu'une fusion ne touche aucun fichier copie ci-dessus. Sans cette
-      # condition, le pipeline echouerait sans qu'aucun probleme reel existe.
+      # git commit sort en erreur quand rien n'a change. Sans cette condition,
+      # une fusion ne touchant aucun fichier copie ferait echouer le pipeline.
       - name: Publie sur le Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
