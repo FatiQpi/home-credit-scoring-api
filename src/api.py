@@ -7,8 +7,9 @@ codes de statut.
 """
 
 from contextlib import asynccontextmanager
+from time import perf_counter
 
-from fastapi import FastAPI, Request
+from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from src.features import (
@@ -19,6 +20,7 @@ from src.features import (
     load_store,
     predict,
 )
+from src.journal import enregistrer
 from src.schemas import Demande, Reponse
 
 
@@ -51,7 +53,25 @@ app = FastAPI(
 async def client_not_found_handler(
     request: Request, exc: ClientNotFoundError
 ) -> JSONResponse:
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
+    # L'objet BackgroundTasks injecte dans la route est perdu des qu'elle leve :
+    # FastAPI ne l'attache qu'a un retour normal. Le 404 se journalise donc ici,
+    # sur une file construite a la main et portee par la reponse d'erreur.
+    debut = getattr(request.state, "debut", None)
+
+    taches = BackgroundTasks()
+    taches.add_task(
+        enregistrer,
+        statut=404,
+        # -1.0 marque un chemin theoriquement inatteignable : seule predire leve
+        # cette exception, et elle pose debut des sa premiere ligne.
+        duree_totale_ms=(perf_counter() - debut) * 1000 if debut else -1.0,
+        sk_id_curr=getattr(request.state, "sk_id_curr", None),
+        version_api=request.app.version,
+    )
+
+    return JSONResponse(
+        status_code=404, content={"detail": str(exc)}, background=taches
+    )
 
 
 # Sans cette route, la racine du Space repond 404 au visiteur qui ouvre le
@@ -74,11 +94,35 @@ def racine(request: Request) -> dict:
     summary="Score un client par son identifiant",
     responses={404: {"description": "Aucune donnee pour cet identifiant."}},
 )
+def predire(demande: Demande, request: Request, taches: BackgroundTasks) -> dict:
+    # perf_counter et non time : compteur monotone, insensible aux ajustements
+    # d'horloge du systeme, qui produiraient des durees negatives.
+    debut = perf_counter()
 
+    # Deposes pour le gestionnaire de 404, qui n'a acces ni aux chronometres ni
+    # a la demande une fois l'exception levee.
+    request.state.debut = debut
+    request.state.sk_id_curr = demande.SK_ID_CURR
 
-def predire(demande: Demande, request: Request) -> dict:
     features = get_features(demande.SK_ID_CURR, request.app.state.store)
+
+    avant = perf_counter()
     resultat = predict(request.app.state.model, features)
+    apres = perf_counter()
+
+    # Executee apres l'envoi de la reponse : un echec d'ecriture ne peut pas
+    # transformer ce 200 en 500, et l'aller-retour Supabase sort du chemin
+    # chronometre.
+    taches.add_task(
+        enregistrer,
+        statut=200,
+        duree_totale_ms=(apres - debut) * 1000,
+        sk_id_curr=demande.SK_ID_CURR,
+        score_risque=resultat["score_risque"],
+        decision=resultat["decision"],
+        duree_inference_ms=(apres - avant) * 1000,
+        version_api=request.app.version,
+    )
 
     return {"SK_ID_CURR": demande.SK_ID_CURR, **resultat}
 

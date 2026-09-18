@@ -7,6 +7,14 @@ from src.api import app
 from src.features import load_artifacts, load_model, load_store
 
 
+# Sans cette fixture, lancer pytest dans un terminal configure ferait ecrire la
+# suite dans la vraie table : le TestClient attend les taches d'arriere-plan.
+@pytest.fixture(autouse=True)
+def sans_supabase(monkeypatch):
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
+
+
 # Portee session : le magasin de 40 Mo est lu une fois pour toute la suite.
 @pytest.fixture(scope="session")
 def artifacts():
