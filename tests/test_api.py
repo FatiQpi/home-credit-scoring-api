@@ -1,5 +1,8 @@
 """Tests de la couche HTTP : codes de statut, contrat de reponse, documentation."""
 
+import urllib.error
+import urllib.request
+
 import pytest
 
 from src.features import get_features, predict
@@ -70,6 +73,67 @@ def test_champ_surnumeraire_refuse(client, client_id):
     )
 
     assert reponse.status_code == 422
+
+
+# --- Journalisation ---
+
+
+@pytest.fixture
+def journalise(monkeypatch) -> list:
+    """Intercepte les appels au journal. Vise src.api : le nom y est deja
+    resolu, remplacer src.journal.enregistrer n'aurait aucun effet."""
+    appels = []
+    monkeypatch.setattr("src.api.enregistrer", lambda **champs: appels.append(champs))
+    return appels
+
+
+def test_predict_journalise_l_appel(client, client_id, journalise):
+    client.post("/predict", json={"SK_ID_CURR": client_id})
+
+    assert len(journalise) == 1
+    appel = journalise[0]
+
+    assert appel["statut"] == 200
+    assert appel["sk_id_curr"] == client_id
+    assert 0.0 <= appel["score_risque"] <= 1.0
+    assert appel["decision"] in ("ACCORDE", "REFUSE")
+    # L'inference est incluse dans le total : l'ecart mesure la lecture du magasin.
+    assert appel["duree_inference_ms"] > 0
+    assert appel["duree_totale_ms"] >= appel["duree_inference_ms"]
+
+
+def test_client_inconnu_journalise_le_404(client, journalise):
+    client.post("/predict", json={"SK_ID_CURR": CLIENT_INCONNU})
+
+    appel = journalise[0]
+
+    assert appel["statut"] == 404
+    assert appel["sk_id_curr"] == CLIENT_INCONNU
+    # Chemin fragile : ces deux valeurs ne peuvent venir que de request.state,
+    # l'exception ayant interrompu la route. Une duree negative signalerait que
+    # le depot n'a pas traverse jusqu'au gestionnaire.
+    assert appel["duree_totale_ms"] > 0
+    assert appel.get("score_risque") is None
+
+
+def test_echec_d_envoi_laisse_la_reponse_intacte(
+    client, client_id, monkeypatch, capsys
+):
+    # Preuve du mode degrade, sur la chaine reelle : route, tache differee,
+    # journal, echec reseau. La reponse est deja partie quand l'ecriture echoue.
+    monkeypatch.setenv("SUPABASE_URL", "https://exemple.supabase.co")
+    monkeypatch.setenv("SUPABASE_KEY", "cle-de-test")
+
+    def faux_urlopen(requete, timeout=None):
+        raise urllib.error.URLError("injoignable")
+
+    monkeypatch.setattr(urllib.request, "urlopen", faux_urlopen)
+
+    reponse = client.post("/predict", json={"SK_ID_CURR": client_id})
+
+    assert reponse.status_code == 200
+    assert reponse.json()["SK_ID_CURR"] == client_id
+    assert "echec_envoi" in capsys.readouterr().err
 
 
 # --- Sonde ---
