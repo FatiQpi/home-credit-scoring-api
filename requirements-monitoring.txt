@@ -1,0 +1,8 @@
+-r requirements.txt
+
+evidently==0.7.23
+supabase==2.31.0
+ipykernel==7.3.0
+streamlit==1.64.0
+python-dotenv==1.2.3
+altair==6.3.0
