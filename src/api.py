@@ -41,7 +41,7 @@ app = FastAPI(
         "La demande ne porte qu'un identifiant : les features sont lues "
         "dans un magasin charge au demarrage."
     ),
-    version="1.0.0",
+    version="1.0.1",
     lifespan=lifespan,
 )
 
